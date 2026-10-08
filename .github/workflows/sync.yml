@@ -32,3 +32,16 @@ jobs:
           ARTICLES_STORAGE: github
           ARTICLES_GITHUB_REPOSITORY: ${{ github.repository }}
           ARTICLES_GITHUB_TOKEN: ${{ github.token }}
+      # GitHub disables public-repository schedules after 60 days without activity.
+      # An occasional empty commit keeps checks active without rewriting article data.
+      - name: Keep scheduled publishing checks active
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          git fetch --depth=1 origin main
+          last_commit=$(git log -1 --format=%ct origin/main)
+          if [ $(( $(date +%s) - last_commit )) -gt 2592000 ]; then
+            git switch --detach origin/main
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit --allow-empty -m 'Keep scheduled Notion publishing checks active'
+            git push origin HEAD:main
+          fi
