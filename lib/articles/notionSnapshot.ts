@@ -3,7 +3,7 @@ import type { Article, ArticleRepository } from './types';
 import { compareArticlesByRecency } from './sort';
 const run = z.object({ text: z.string(), bold: z.boolean().optional(), italic: z.boolean().optional(), underline: z.boolean().optional(), strikethrough: z.boolean().optional(), code: z.boolean().optional(), link: z.string().optional() });
 const block = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('paragraph'), runs: z.array(run) }), z.object({ type: z.literal('heading'), level: z.union([z.literal(2), z.literal(3), z.literal(4)]), runs: z.array(run) }),
+  z.object({ type: z.literal('paragraph'), runs: z.array(run) }), z.object({ type: z.literal('heading'), level: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]), runs: z.array(run) }),
   z.object({ type: z.literal('quote'), runs: z.array(run) }), z.object({ type: z.literal('list-item'), ordered: z.boolean(), level: z.number().int().nonnegative(), runs: z.array(run) }),
   z.object({ type: z.literal('rule') }), z.object({ type: z.literal('table'), rows: z.array(z.array(z.string())) }),
   z.object({ type: z.literal('image'), assetId: z.string(), alt: z.string(), caption: z.string().optional(), width: z.number().optional(), height: z.number().optional() }), z.object({ type: z.literal('legacy-markdown'), markdown: z.string() }),
