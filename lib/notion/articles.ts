@@ -1,3 +1,4 @@
+import { isLegacyUndatedArticle } from '../articles/legacyUndated';
 import type { Article, ArticleBlock, ArticleTextRun } from '../articles/types';
 
 export type NotionRichText = { plain_text?: string; text?: { content: string; link?: { url: string } | null }; href?: string | null; annotations?: { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; code?: boolean }; type?: string; equation?: { expression: string } };
@@ -24,7 +25,8 @@ export function notionPageToArticle(page: NotionPage, body: NotionBlock[]): Arti
   if (!page.id || !title || !slug || /[\s/?#\\]/.test(slug) || slug === '.' || slug === '..') throw new Error('Article requires a title and stable URL-safe slug');
   if (!['Draft', 'Published', 'Archived'].includes(status)) throw new Error('Article status must be Draft, Published or Archived');
   if (!['News', 'Press Office'].includes(section)) throw new Error('Only News and Press Office belong in the Notion Articles CMS');
-  if (status === 'Published' && (!date || !Number.isFinite(Date.parse(date)) || !propertyText(page, 'Standfirst').trim())) throw new Error('Published article requires a valid publish date and standfirst');
+  const legacyUndated = !date && isLegacyUndatedArticle(slug, propertyText(page, 'Original Craft ID'));
+  if (status === 'Published' && ((!legacyUndated && (!date || !Number.isFinite(Date.parse(date)))) || !propertyText(page, 'Standfirst').trim())) throw new Error('Published article requires a valid publish date and standfirst');
   const article: Article = {
     id: `notion:${page.id}`, source: 'notion', sourceId: propertyText(page, 'Source ID') || propertyText(page, 'Original Craft ID') || page.id,
     sourceRevision: page.last_edited_time, title, nativeTitle: propertyText(page, 'Native title') || undefined, slug,
