@@ -1,4 +1,3 @@
-import { normaliseArticleImage } from './media';
 import { storeGitHubImage } from './githubStorage';
 import { createHash } from 'node:crypto';
 import { head, put, BlobNotFoundError } from '@vercel/blob';
@@ -6,6 +5,8 @@ import type { Article } from '../articles/types';
 import { notionSnapshotSchema, type NotionSnapshot } from '../articles/notionSnapshot';
 import { articlesDataSourceId, notionClient, type NotionClient } from './client';
 import { isPublishedNotionPage, notionPageToArticle, type NotionPage, type NotionBlock } from './articles';
+import { hasPendingArticleChanges } from './updates';
+import { normaliseArticleImage } from './media';
 
 type List<T> = { results: T[]; has_more: boolean; next_cursor?: string | null };
 export async function queryAllPages(client: NotionClient, dataSourceId: string, filter?: unknown) {
@@ -78,6 +79,8 @@ export async function synchroniseNotionArticles() {
   const previous = await read(); const client = notionClient(); const dataSourceId = articlesDataSourceId();
   if (previous.snapshot && previous.snapshot.dataSourceId !== dataSourceId) throw new Error('Snapshot belongs to a different Notion data source');
   const pages = await queryAllPages(client, dataSourceId);
+  // Frequent scheduled checks are metadata-only when there is nothing to publish.
+  if (previous.snapshot && !hasPendingArticleChanges(pages, previous.snapshot)) return previous.snapshot;
   const snapshot = await buildNotionSnapshot({ pages, previous: previous.snapshot, dataSourceId, blocks: id => readPageBlocks(client, id), media: storeDurableImage });
   // No partially valid generation can silently replace the public content set.
   if (snapshot.errors.length) throw new Error(`Article synchronisation failed: ${JSON.stringify(snapshot.errors)}`);
