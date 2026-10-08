@@ -1,0 +1,27 @@
+# Install in the approved public deployment-content repository after initial migration verification.
+name: Synchronise Notion articles
+on:
+  workflow_dispatch:
+  # Enable the hourly schedule only after NOTION_API_TOKEN is configured and a verified sync succeeds.
+permissions:
+  contents: write
+concurrency:
+  group: notion-articles
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: npm run sync
+        env:
+          NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
+          NOTION_ARTICLES_DATA_SOURCE_ID: '4e96226e-ddc9-4a52-ab14-eac0b3f3801c'
+          ARTICLES_STORAGE: github
+          ARTICLES_GITHUB_REPOSITORY: ${{ github.repository }}
+          ARTICLES_GITHUB_TOKEN: ${{ github.token }}
