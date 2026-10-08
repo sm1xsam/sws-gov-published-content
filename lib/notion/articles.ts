@@ -42,7 +42,7 @@ export function notionPageToArticle(page: NotionPage, body: NotionBlock[]): Arti
       const runs = textRuns(value.rich_text);
       let converted: ArticleBlock | undefined;
       if (block.type === 'paragraph') converted = { type: 'paragraph', runs };
-      else if (/^heading_[123]$/.test(block.type)) converted = { type: 'heading', level: Number(block.type.slice(-1)) === 1 ? 2 : Number(block.type.slice(-1)) as 2 | 3, runs };
+      else if (/^heading_[123]$/.test(block.type)) converted = { type: 'heading', level: Number(block.type.slice(-1)) as 1 | 2 | 3, runs };
       else if (block.type === 'quote' || block.type === 'callout') converted = { type: block.type === 'quote' ? 'quote' : 'paragraph', runs };
       else if (block.type === 'bulleted_list_item' || block.type === 'numbered_list_item' || block.type === 'to_do') converted = { type: 'list-item', ordered: block.type === 'numbered_list_item', level, runs: block.type === 'to_do' ? [{ text: value.checked ? '[x] ' : '[ ] ' }, ...runs] : runs };
       else if (block.type === 'divider') converted = { type: 'rule' };
