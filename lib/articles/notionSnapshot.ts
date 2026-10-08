@@ -11,7 +11,7 @@ const block = z.discriminatedUnion('type', [
 ]);
 export const publishedArticleSchema = z.object({
   id: z.string().min(1), source: z.literal('notion'), sourceId: z.string().min(1), sourceRevision: z.string().optional(), title: z.string().min(1), nativeTitle: z.string().optional(),
-  slug: z.string().min(1).refine(value => !/[\s/?#\\]/.test(value) && value !== '.' && value !== '..'), standfirst: z.string().min(1), publishedAt: z.string().refine(value => value === '' || Number.isFinite(Date.parse(value))),
+  slug: z.string().min(1).refine(value => !/[\s/?#\\]/.test(value) && value !== '.' && value !== '..'), standfirst: z.string().trim().min(1), publishedAt: z.string().refine(value => value === '' || Number.isFinite(Date.parse(value))),
   uploadedAt: z.string().optional(), status: z.literal('published'), tags: z.array(z.string()), section: z.enum(['news', 'press-office']), blocks: z.array(block).min(1),
   assets: z.array(z.object({ id: z.string(), sourceUrl: z.url().refine(url => /^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\//.test(url) || /^https:\/\/github\.com\/sm1xsam\/sws-gov-published-content\/releases\/download\/article-media-v1\/[a-f0-9]{64}\.(jpg|png|webp|gif|avif|svg)$/.test(url)), contentType: z.string().optional(), pathname: z.string().optional() })), sourceUrl: z.string().optional(),
   superfeed: z.object({ importance: z.enum(['automatic', 'breaking', 'major', 'standard', 'minor']).optional(), pinned: z.boolean().optional() }).optional(),
