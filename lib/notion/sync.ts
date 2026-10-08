@@ -55,7 +55,11 @@ export async function buildNotionSnapshot(deps: {
     if (!isPublishedNotionPage(page)) continue;
     const previous = old.get(`notion:${page.id}`);
     try {
-      if (previous && page.last_edited_time && previous.sourceRevision === page.last_edited_time) { articles.push(previous); continue; }
+      // Notion revision times can have minute precision. Re-read pages edited near
+      // the previous sync so a second edit in that minute cannot disappear forever.
+      const revisionSettled = page.last_edited_time && deps.previous &&
+        Date.parse(page.last_edited_time) < Date.parse(deps.previous.updatedAt) - 60_000;
+      if (previous && revisionSettled && previous.sourceRevision === page.last_edited_time) { articles.push(previous); continue; }
       const article = notionPageToArticle(page, await deps.blocks(page.id));
       if (slugLocks[page.id] && slugLocks[page.id] !== article.slug) throw new Error(`Published slug is locked to ${slugLocks[page.id]}; restore it in Notion`);
       for (const asset of article.assets) { const media = await deps.media(asset.sourceUrl!); asset.sourceUrl = media.url; asset.contentType = media.contentType; }
