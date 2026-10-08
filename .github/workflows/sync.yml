@@ -1,7 +1,13 @@
 # Install in the approved public deployment-content repository after initial migration verification.
 name: Synchronise Notion articles
+run-name: ${{ inputs.request_id && format('Website refresh {0}', inputs.request_id) || 'Scheduled / editorial Notion sync' }}
 on:
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: Website refresh correlation ID (optional)
+        required: false
+        type: string
   schedule:
     - cron: '17 * * * *'
 permissions:
