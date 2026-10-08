@@ -2,7 +2,8 @@
 name: Synchronise Notion articles
 on:
   workflow_dispatch:
-  # Enable the hourly schedule only after NOTION_API_TOKEN is configured and a verified sync succeeds.
+  schedule:
+    - cron: '17 * * * *'
 permissions:
   contents: write
 concurrency:
