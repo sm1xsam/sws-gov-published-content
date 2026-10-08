@@ -30,7 +30,7 @@ export function notionPageToArticle(page: NotionPage, body: NotionBlock[]): Arti
   const article: Article = {
     id: `notion:${page.id}`, source: 'notion', sourceId: propertyText(page, 'Source ID') || propertyText(page, 'Original Craft ID') || page.id,
     sourceRevision: page.last_edited_time, title, nativeTitle: propertyText(page, 'Native title') || undefined, slug,
-    standfirst: propertyText(page, 'Standfirst'), publishedAt: date, uploadedAt: page.properties['Original created']?.date?.start || (propertyText(page, 'Original Craft ID') ? undefined : page.created_time),
+    standfirst: propertyText(page, 'Standfirst').trim(), publishedAt: date, uploadedAt: page.properties['Original created']?.date?.start || (propertyText(page, 'Original Craft ID') ? undefined : page.created_time),
     status: status.toLowerCase() as Article['status'], section: section === 'News' ? 'news' : 'press-office',
     tags: (page.properties.Tags?.multi_select || []).map(tag => tag.name.replace(/^(Glasgow|Homepage|Transport) \(capitalised\)$/, '$1')), blocks: [], assets: [], sourceUrl: page.properties['Source URL']?.url || undefined,
     superfeed: { importance: 'automatic', pinned: page.properties['Superfeed pinned']?.checkbox === true },
