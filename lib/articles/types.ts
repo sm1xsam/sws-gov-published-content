@@ -13,7 +13,7 @@ export type ArticleTextRun = {
 
 export type ArticleBlock =
   | { type: 'paragraph'; runs: ArticleTextRun[] }
-  | { type: 'heading'; level: 2 | 3 | 4; runs: ArticleTextRun[] }
+  | { type: 'heading'; level: 1 | 2 | 3 | 4; runs: ArticleTextRun[] }
   | { type: 'list-item'; ordered: boolean; level: number; runs: ArticleTextRun[] }
   | { type: 'quote'; runs: ArticleTextRun[] }
   | { type: 'rule' }
