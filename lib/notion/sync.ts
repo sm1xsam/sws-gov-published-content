@@ -1,3 +1,4 @@
+import { normaliseArticleImage } from './media';
 import { storeGitHubImage } from './githubStorage';
 import { createHash } from 'node:crypto';
 import { head, put, BlobNotFoundError } from '@vercel/blob';
@@ -30,10 +31,9 @@ export async function storeDurableImage(url: string): Promise<{ url: string; con
   if (!allowed.includes(source.hostname)) throw new Error(`Image host ${source.hostname} needs an explicit migration/storage policy`);
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw new Error(`Image retrieval failed (${response.status})`);
-  const contentType = response.headers.get('content-type')?.split(';')[0] || '';
-  if (!contentType.startsWith('image/')) throw new Error('Article asset is not an image');
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (!bytes.length || bytes.length > 25 * 1024 * 1024) throw new Error('Image must be between 1 byte and 25 MB');
+  const sourceType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() || '';
+  if (!sourceType.startsWith('image/')) throw new Error('Article asset is not an image');
+  const { bytes, contentType } = await normaliseArticleImage(Buffer.from(await response.arrayBuffer()), sourceType);
   if (process.env.ARTICLES_STORAGE !== 'blob') return storeGitHubImage(bytes, contentType);
   const hash = createHash('sha256').update(bytes).digest('hex');
   const extension = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif', 'image/svg+xml': 'svg' } as Record<string, string>)[contentType];

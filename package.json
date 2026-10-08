@@ -7,6 +7,7 @@
   "dependencies": {
     "@vercel/blob": "2.8.0",
     "zod": "4.1.13",
-    "tsx": "4.21.0"
+    "tsx": "4.21.0",
+    "heic-convert": "2.1.0"
   }
 }
