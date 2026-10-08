@@ -6,7 +6,7 @@ import { notionSnapshotSchema, type NotionSnapshot } from '../articles/notionSna
 import { articlesDataSourceId, notionClient, type NotionClient } from './client';
 import { isPublishedNotionPage, notionPageToArticle, type NotionPage, type NotionBlock } from './articles';
 import { hasPendingArticleChanges } from './updates';
-import { normaliseArticleImage } from './media';
+import { fetchArticleImage, normaliseArticleImage } from './media';
 
 type List<T> = { results: T[]; has_more: boolean; next_cursor?: string | null };
 export async function queryAllPages(client: NotionClient, dataSourceId: string, filter?: unknown) {
@@ -27,10 +27,7 @@ export async function storeDurableImage(url: string): Promise<{ url: string; con
   const source = new URL(url);
   if (source.protocol !== 'https:') throw new Error('Article image requires HTTPS');
   if (source.hostname.endsWith('.public.blob.vercel-storage.com') || /^https:\/\/github\.com\/sm1xsam\/sws-gov-published-content\/releases\/download\/article-media-v1\/[a-f0-9]{64}\.(jpg|png|webp|gif|avif|svg)$/.test(url)) return { url, contentType: 'image/*' };
-  // Only download trusted CMS/provider hosts. Never fetch arbitrary internal URLs supplied in page content.
-  const allowed = ['r.craft.do', 'images.unsplash.com', 'prod-files-secure.s3.us-west-2.amazonaws.com', 's3.us-west-2.amazonaws.com', 'file.notion.so', 'secure.notion-static.com', 'prod-files-secure.s3.amazonaws.com'];
-  if (!allowed.includes(source.hostname)) throw new Error(`Image host ${source.hostname} needs an explicit migration/storage policy`);
-  const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+  const response = await fetchArticleImage(url);
   if (!response.ok) throw new Error(`Image retrieval failed (${response.status})`);
   const sourceType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() || '';
   if (!sourceType.startsWith('image/')) throw new Error('Article asset is not an image');
