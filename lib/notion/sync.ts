@@ -5,7 +5,7 @@ import type { Article } from '../articles/types';
 import { notionSnapshotSchema, type NotionSnapshot } from '../articles/notionSnapshot';
 import { articlesDataSourceId, notionClient } from './client';
 import { isPublishedNotionPage, notionPageToArticle, type NotionPage, type NotionBlock } from './articles';
-import { hasPendingArticleChanges, needsHtmlEmbedUpgrade } from './updates';
+import { hasPendingArticleChanges, hasLegacyHtmlEmbedLink } from './updates';
 import { fetchArticleImage, normaliseArticleImage } from './media';
 import { fetchHtmlEmbed, resolveHtmlEmbeds } from './htmlEmbeds';
 
@@ -47,11 +47,17 @@ export async function buildNotionSnapshot(deps: {
       // the previous sync so a second edit in that minute cannot disappear forever.
       const revisionSettled = page.last_edited_time && deps.previous &&
         Date.parse(page.last_edited_time) < Date.parse(deps.previous.updatedAt) - 60_000;
-      if (!deps.force && previous && revisionSettled && previous.sourceRevision === page.last_edited_time) { articles.push(previous); continue; }
+      const upgrade = deps.previous?.converterVersion !== 2 && previous && hasLegacyHtmlEmbedLink(previous);
+      const unchanged = previous && revisionSettled && previous.sourceRevision === page.last_edited_time;
+      if (!deps.force && !upgrade && unchanged) { articles.push(previous); continue; }
       const article = notionPageToArticle(page, await deps.blocks(page.id));
       if (slugLocks[page.id] && slugLocks[page.id] !== article.slug) throw new Error(`Published slug is locked to ${slugLocks[page.id]}; restore it in Notion`);
       await resolveHtmlEmbeds(article.blocks, deps.htmlEmbed);
-      for (const asset of article.assets) { const media = await deps.media(asset.sourceUrl!); asset.sourceUrl = media.url; asset.contentType = media.contentType; }
+      for (const asset of article.assets) {
+        const stored = upgrade && unchanged && !deps.force ? previous.assets.find(item => item.id === asset.id) : undefined;
+        if (stored?.sourceUrl) { asset.sourceUrl = stored.sourceUrl; asset.contentType = stored.contentType; }
+        else { const media = await deps.media(asset.sourceUrl!); asset.sourceUrl = media.url; asset.contentType = media.contentType; }
+      }
       slugLocks[page.id] = article.slug; articles.push(article);
     } catch (error) {
       errors.push({ pageId: page.id, message: error instanceof Error ? error.message : 'Article conversion failed' });
@@ -69,8 +75,7 @@ export async function synchroniseNotionArticles(options: { force?: boolean } = {
   const pages = await queryAllPages(client, dataSourceId);
   // Frequent scheduled checks are metadata-only when there is nothing to publish.
   if (!options.force && previous.snapshot && !hasPendingArticleChanges(pages, previous.snapshot)) return previous.snapshot;
-  const snapshot = await buildNotionSnapshot({ pages, previous: previous.snapshot, dataSourceId, blocks: id => readPageBlocks(client, id), media: storeDurableImage,
-    force: options.force || Boolean(previous.snapshot && needsHtmlEmbedUpgrade(previous.snapshot)) });
+  const snapshot = await buildNotionSnapshot({ pages, previous: previous.snapshot, dataSourceId, blocks: id => readPageBlocks(client, id), media: storeDurableImage, force: options.force });
   // No partially valid generation can silently replace the public content set.
   if (snapshot.errors.length) throw new Error(`Article synchronisation failed: ${JSON.stringify(snapshot.errors)}`);
   await save(snapshot, previous.etag); return snapshot;

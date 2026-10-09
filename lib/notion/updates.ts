@@ -3,10 +3,14 @@ import type { NotionSnapshot } from '../articles/notionSnapshot';
 import { isPublishedNotionPage, type NotionPage } from './articles';
 import { NotionApiError } from './client';
 import { isHtmlEmbedUrl } from './htmlEmbeds';
+import type { Article } from '../articles/types';
+
+export function hasLegacyHtmlEmbedLink(article: Article): boolean {
+  return article.blocks.some(block => block.type === 'paragraph' && block.runs.some(run => run.link && isHtmlEmbedUrl(run.link)));
+}
 
 export function needsHtmlEmbedUpgrade(snapshot: NotionSnapshot): boolean {
-  return snapshot.converterVersion !== 2 && snapshot.articles.some(article => article.blocks.some(block =>
-    block.type === 'paragraph' && block.runs.some(run => run.link && isHtmlEmbedUrl(run.link))));
+  return snapshot.converterVersion !== 2 && snapshot.articles.some(hasLegacyHtmlEmbedLink);
 }
 
 export type ArticleUpdateCheck = { version: string; pending: boolean | null; published: number; updatedAt: string };
