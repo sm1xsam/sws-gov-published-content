@@ -2,11 +2,18 @@ import { articleContentVersion } from '../articles/version';
 import type { NotionSnapshot } from '../articles/notionSnapshot';
 import { isPublishedNotionPage, type NotionPage } from './articles';
 import { NotionApiError } from './client';
+import { isHtmlEmbedUrl } from './htmlEmbeds';
+
+export function needsHtmlEmbedUpgrade(snapshot: NotionSnapshot): boolean {
+  return snapshot.converterVersion !== 2 && snapshot.articles.some(article => article.blocks.some(block =>
+    block.type === 'paragraph' && block.runs.some(run => run.link && isHtmlEmbedUrl(run.link))));
+}
 
 export type ArticleUpdateCheck = { version: string; pending: boolean | null; published: number; updatedAt: string };
 
 /** Metadata only. Also detects archiving, deletion and new published pages. */
 export function hasPendingArticleChanges(pages: NotionPage[], snapshot: NotionSnapshot): boolean {
+  if (needsHtmlEmbedUpgrade(snapshot)) return true;
   const published = pages.filter(isPublishedNotionPage);
   if (published.length !== snapshot.articles.length) return true;
   const previous = new Map(snapshot.articles.map(article => [article.id, article.sourceRevision]));

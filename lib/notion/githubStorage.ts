@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { notionSnapshotSchema, type NotionSnapshot } from '../articles/notionSnapshot';
+import { notionSnapshotSchema, snapshotForStorage, type NotionSnapshot } from '../articles/notionSnapshot';
 export const contentRepository = () => process.env.ARTICLES_GITHUB_REPOSITORY || 'sm1xsam/sws-gov-published-content';
 export const mediaTag = 'article-media-v1';
 export const githubHeaders = () => ({ Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(process.env.ARTICLES_GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.ARTICLES_GITHUB_TOKEN}` } : {}) });
@@ -17,7 +17,7 @@ export async function readGitHubSnapshotForSync(): Promise<{ snapshot?: NotionSn
   return { snapshot: notionSnapshotSchema.parse(JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'))), etag: data.sha };
 }
 export async function saveGitHubSnapshot(snapshot: NotionSnapshot, sha?: string) {
-  const validated = notionSnapshotSchema.parse(snapshot);
+  const validated = snapshotForStorage(snapshot);
   await githubRequest('/contents/published.json', 'PUT', { message: `Synchronise Notion articles ${validated.updatedAt}`, content: Buffer.from(JSON.stringify(validated)).toString('base64'), ...(sha ? { sha } : {}) });
 }
 export async function storeGitHubImage(bytes: Uint8Array, contentType: string) {

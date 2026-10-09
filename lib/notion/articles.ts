@@ -1,5 +1,6 @@
 import { isLegacyUndatedArticle } from '../articles/legacyUndated';
 import type { Article, ArticleBlock, ArticleTextRun } from '../articles/types';
+import { isHtmlEmbedUrl } from './htmlEmbeds';
 
 export type NotionRichText = { plain_text?: string; text?: { content: string; link?: { url: string } | null }; href?: string | null; annotations?: { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; code?: boolean }; type?: string; equation?: { expression: string } };
 export type NotionProperty = { title?: NotionRichText[]; rich_text?: NotionRichText[]; select?: { name: string } | null; status?: { name: string } | null; multi_select?: { name: string }[]; date?: { start: string } | null; checkbox?: boolean; url?: string | null };
@@ -38,6 +39,13 @@ export function notionPageToArticle(page: NotionPage, body: NotionBlock[]): Arti
   const importance = choice(page, 'Superfeed importance').toLowerCase();
   if (['automatic', 'breaking', 'major', 'standard', 'minor'].includes(importance)) article.superfeed!.importance = importance as NonNullable<Article['superfeed']>['importance'];
   else if (importance) throw new Error('Unknown Superfeed importance');
+  Object.assign(article, notionBodyToContent(body, title));
+  if (status === 'Published' && !article.blocks.some(block => block.type !== 'paragraph' || block.runs.some(run => run.text.trim()))) throw new Error('Published article requires body content');
+  return article;
+}
+
+export function notionBodyToContent(body: NotionBlock[], title: string): Pick<Article, 'blocks' | 'assets'> {
+  const article: Pick<Article, 'blocks' | 'assets'> = { blocks: [], assets: [] };
   const walk = (blocks: NotionBlock[], level = 0) => {
     for (const block of blocks) {
       const value = (block[block.type] || {}) as BlockValue;
@@ -66,7 +74,9 @@ export function notionPageToArticle(page: NotionPage, body: NotionBlock[]): Arti
       } else if (['bookmark', 'link_preview', 'embed', 'video', 'audio', 'file', 'pdf'].includes(block.type)) {
         const url = value.url || value.external?.url || value.file?.url;
         if (!url) throw new Error(`Missing URL for ${block.type}`);
-        converted = { type: 'paragraph', runs: [{ text: richText(value.caption) || url, link: url }] };
+        converted = block.type === 'embed' && isHtmlEmbedUrl(url)
+          ? { type: 'html-embed', html: '', sourceUrl: url, caption: richText(value.caption) || undefined }
+          : { type: 'paragraph', runs: [{ text: richText(value.caption) || url, link: url }] };
       } else throw new Error(`Unsupported Notion block ${block.type} (${block.id}); snapshot not replaced`);
       if (converted) article.blocks.push(converted);
       if (block.type !== 'table' && block.children) walk(block.children, block.type.includes('list_item') ? level + 1 : level);
@@ -74,6 +84,5 @@ export function notionPageToArticle(page: NotionPage, body: NotionBlock[]): Arti
     }
   };
   walk(body);
-  if (status === 'Published' && !article.blocks.some(block => block.type !== 'paragraph' || block.runs.some(run => run.text.trim()))) throw new Error('Published article requires body content');
   return article;
 }

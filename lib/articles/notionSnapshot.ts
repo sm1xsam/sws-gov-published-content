@@ -2,8 +2,10 @@ import { isLegacyUndatedArticle } from './legacyUndated';
 import { z } from 'zod';
 import type { Article, ArticleRepository } from './types';
 import { compareArticlesByRecency } from './sort';
+import { renderArticleHtmlEmbed } from './htmlEmbed';
 const run = z.object({ text: z.string(), bold: z.boolean().optional(), italic: z.boolean().optional(), underline: z.boolean().optional(), strikethrough: z.boolean().optional(), code: z.boolean().optional(), link: z.string().optional() });
 const block = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('html-embed'), html: z.string().trim().min(1).max(1024 * 1024), caption: z.string().optional() }),
   z.object({ type: z.literal('paragraph'), runs: z.array(run) }), z.object({ type: z.literal('heading'), level: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]), runs: z.array(run) }),
   z.object({ type: z.literal('quote'), runs: z.array(run) }), z.object({ type: z.literal('list-item'), ordered: z.boolean(), level: z.number().int().nonnegative(), runs: z.array(run) }),
   z.object({ type: z.literal('rule') }), z.object({ type: z.literal('table'), rows: z.array(z.array(z.string())) }),
@@ -18,9 +20,17 @@ export const publishedArticleSchema = z.object({
 }).superRefine((article, ctx) => { if (!article.publishedAt && !isLegacyUndatedArticle(article.slug, article.sourceId)) ctx.addIssue({ code: 'custom', message: 'Published article requires a publication date' }); for (const block of article.blocks) if (block.type === 'image' && !article.assets.some(asset => asset.id === block.assetId)) ctx.addIssue({ code: 'custom', message: `Image ${block.assetId} missing durable asset` }); });
 export const notionSnapshotSchema = z.object({
   schemaVersion: z.literal(1), provider: z.literal('notion'), dataSourceId: z.string(), updatedAt: z.iso.datetime(),
+  converterVersion: z.literal(2).optional(),
   articles: z.array(publishedArticleSchema), slugLocks: z.record(z.string(), z.string()), errors: z.array(z.object({ pageId: z.string(), message: z.string() })),
 }).superRefine((snapshot, ctx) => { if (new Set(snapshot.articles.map(article => article.slug)).size !== snapshot.articles.length) ctx.addIssue({ code: 'custom', message: 'Duplicate article slugs' }); });
 export type NotionSnapshot = z.infer<typeof notionSnapshotSchema>;
+
+/** Keep the public format readable by website deployments predating native HTML embeds. */
+export function snapshotForStorage(snapshot: NotionSnapshot): NotionSnapshot {
+  const validated = notionSnapshotSchema.parse(snapshot);
+  return { ...validated, articles: validated.articles.map(article => ({ ...article, blocks: article.blocks.map(block =>
+    block.type === 'html-embed' ? { type: 'legacy-markdown' as const, markdown: renderArticleHtmlEmbed(block.html, block.caption) } : block) })) };
+}
 export function createSnapshotRepository(read: () => Promise<NotionSnapshot>): ArticleRepository {
   return {
     async listPublished() { return [...(await read()).articles].sort(compareArticlesByRecency) as Article[]; },

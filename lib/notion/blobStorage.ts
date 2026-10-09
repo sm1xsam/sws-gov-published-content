@@ -1,5 +1,5 @@
 import { BlobNotFoundError, head, put } from '@vercel/blob';
-import { notionSnapshotSchema, type NotionSnapshot } from '../articles/notionSnapshot';
+import { notionSnapshotSchema, snapshotForStorage, type NotionSnapshot } from '../articles/notionSnapshot';
 export const SNAPSHOT_PATH = 'articles/notion/published-v1.json';
 function token() { return process.env.ARTICLES_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN; }
 export async function readSnapshotForSync(): Promise<{ snapshot?: NotionSnapshot; etag?: string }> {
@@ -11,7 +11,7 @@ export async function readSnapshotForSync(): Promise<{ snapshot?: NotionSnapshot
   } catch (error) { if (error instanceof BlobNotFoundError) return {}; throw error; }
 }
 export async function saveSnapshot(snapshot: NotionSnapshot, etag?: string) {
-  const validated = notionSnapshotSchema.parse(snapshot);
+  const validated = snapshotForStorage(snapshot);
   if (!token()) throw new Error('Article synchronisation requires a Blob write token');
   // Immutable recovery generation first; compare-and-swap protects against concurrent refreshes.
   await put(`articles/notion/history/${validated.updatedAt.replace(/[:.]/g, '-')}.json`, JSON.stringify(validated), { access: 'public', addRandomSuffix: true, contentType: 'application/json', token: token() });

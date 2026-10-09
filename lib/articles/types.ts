@@ -19,6 +19,7 @@ export type ArticleBlock =
   | { type: 'rule' }
   | { type: 'table'; rows: string[][] }
   | { type: 'image'; assetId: string; alt: string; caption?: string; width?: number; height?: number }
+  | { type: 'html-embed'; html: string; caption?: string; sourceUrl?: string }
   | { type: 'legacy-markdown'; markdown: string };
 
 export type ArticleAsset = {
