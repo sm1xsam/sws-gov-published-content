@@ -10,11 +10,25 @@ export async function githubRequest<T>(path: string, method = 'GET', body?: unkn
   return response.json() as Promise<T>;
 }
 export async function readGitHubSnapshotForSync(): Promise<{ snapshot?: NotionSnapshot; etag?: string }> {
-  const response = await fetch(`https://api.github.com/repos/${contentRepository()}/contents/published.json`, { headers: githubHeaders(), cache: 'no-store', signal: AbortSignal.timeout(15000) });
+  const repository = contentRepository();
+  const response = await fetch(`https://api.github.com/repos/${repository}/contents/published.json`, { headers: { ...githubHeaders(), Accept: 'application/vnd.github.object+json' }, cache: 'no-store', signal: AbortSignal.timeout(15000) });
   if (response.status === 404) return {};
   if (!response.ok) throw new Error(`GitHub snapshot unavailable (${response.status})`);
-  const data = await response.json() as { content: string; sha: string };
-  return { snapshot: notionSnapshotSchema.parse(JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'))), etag: data.sha };
+  const data = await response.json() as { content: string; encoding: string; sha: string };
+  if (!/^[a-f0-9]{40}$/.test(data.sha)) throw new Error('GitHub snapshot metadata has no valid file SHA');
+  let snapshot: unknown;
+  if (data.encoding === 'base64' && data.content) {
+    snapshot = JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'));
+  } else if (data.encoding === 'none') {
+    // Contents omits inline data above 1 MB. Read the exact blob so the body
+    // and the SHA used for the conditional save always identify one generation.
+    const blob = await fetch(`https://api.github.com/repos/${repository}/git/blobs/${data.sha}`, { headers: { ...githubHeaders(), Accept: 'application/vnd.github.raw+json' }, cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    if (!blob.ok) throw new Error(`GitHub snapshot blob unavailable (${blob.status})`);
+    snapshot = await blob.json();
+  } else {
+    throw new Error('GitHub snapshot has no supported content encoding');
+  }
+  return { snapshot: notionSnapshotSchema.parse(snapshot), etag: data.sha };
 }
 export async function saveGitHubSnapshot(snapshot: NotionSnapshot, sha?: string) {
   const validated = snapshotForStorage(snapshot);
