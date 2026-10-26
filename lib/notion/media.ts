@@ -21,8 +21,14 @@ export async function fetchArticleImage(url: string, request: typeof fetch = fet
 }
 
 /** Convert iPhone originals on the sync worker; the original remains in the Notion page. */
-export async function normaliseArticleImage(bytes: Buffer, contentType: string, convert?: Converter): Promise<{ bytes: Buffer; contentType: string }> {
+export async function normaliseArticleImage(bytes: Buffer, contentType: string, convert?: Converter, decodeJxl?: (bytes: Buffer) => Promise<Buffer>): Promise<{ bytes: Buffer; contentType: string }> {
   if (!bytes.length || bytes.length > 25 * 1024 * 1024) throw new Error('Image must be between 1 byte and 25 MB');
+  if (contentType === 'image/jxl') {
+    const converted = await (decodeJxl || (await import('./jxl')).decodeJxlImage)(bytes);
+    if (converted.length > 25 * 1024 * 1024 || !converted.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) throw new Error('JPEG XL conversion did not produce a valid PNG within the image size limit');
+    return { bytes: converted, contentType: 'image/png' };
+  }
+  if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/svg+xml', 'image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'].includes(contentType)) throw new Error(`Unsupported article image format ${contentType}; upload PNG, JPEG, WebP, GIF, AVIF, SVG, HEIC/HEIF or JPEG XL in Notion`);
   if (!['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'].includes(contentType)) return { bytes, contentType };
   const converter = convert || (await import('heic-convert')).default;
   const output = await converter({ buffer: bytes, format: 'JPEG', quality: 0.95 });
